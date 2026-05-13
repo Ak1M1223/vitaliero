@@ -979,6 +979,7 @@ void Gfx::draw(SDL_Surface& surface, SDL_Texture& texture, SDL_Renderer& sdlRend
 	uint32_t pal32[256];
 	preparePalette(surface.format, realPal, pal32);
 	scaleDraw(src, renderer.renderResX, renderer.renderResY, srcPitch, dest, destPitch, mag, pal32);
+	SDL_RenderClear(&sdlRenderer);
 	SDL_UpdateTexture(&texture, NULL, surface.pixels, surface.w * 4);
 	if (SDL_RenderCopy(&sdlRenderer, &texture, NULL, NULL) != 0) {
         sceClibPrintf("SDL_RenderCopy Error: %s\n", SDL_GetError());
