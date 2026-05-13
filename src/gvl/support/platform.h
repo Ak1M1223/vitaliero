@@ -57,18 +57,22 @@
 # endif
 #endif
 
-#if !GVL_X86 && !GVL_X86_64
+#if !GVL_X86 && !GVL_X86_64 && !defined(GVL_ARM) && !defined(GVL_ARM64)
 # if defined(_M_X64) || defined(__x86_64__) || GVL_WIN64
 #  define GVL_X86_64 1
 # elif defined(__i386__) || defined(_M_IX86) || defined(i386) || defined(i486) || defined(intel) || defined(x86) || defined(i86pc)
 #  define GVL_X86 1
+# elif defined(__aarch64__) || defined(_M_ARM64)
+#  define GVL_ARM64 1
+# elif defined(__arm__) || defined(_M_ARM)
+#  define GVL_ARM 1
 # else
 #  error "Unknown architecture, please add it"
 # endif
 #endif
 
 #if !GVL_LITTLE_ENDIAN && !GVL_BIG_ENDIAN
-# if GVL_X86 || GVL_X86_64
+# if GVL_X86 || GVL_X86_64 || GVL_ARM || GVL_ARM64
 #  define GVL_LITTLE_ENDIAN 1
 # else
 #  define GVL_BIG_ENDIAN 1

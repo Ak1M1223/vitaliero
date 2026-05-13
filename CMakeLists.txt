@@ -1,18 +1,58 @@
-cmake_minimum_required(VERSION 3.21)
-project(openliero)
+
+message(STATUS "=== OpenLieroVita ===")
+message(STATUS "VitaSDK: $ENV{VITASDK}")
+message(STATUS "SDL2:  ${SDL2_INCLUDE_DIRS}")
+
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+
+add_compile_options(-mthumb -ffunction-sections -fdata-sections -fvisibility=hidden -fvisibility-inlines-hidden)
+
+cmake_minimum_required(VERSION 3.16)
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  if(DEFINED ENV{VITASDK})
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
+  else()
+    message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
+  endif()
+endif()
+
+project(openlierovita)
+include("${VITASDK}/share/vita.cmake" REQUIRED)
+include("$ENV{VITASDK}/share/vita.toolchain.cmake" REQUIRED)
 
 find_package(SDL2 REQUIRED)
-find_package(SDL2_Image REQUIRED)
-include_directories(
-    ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/ffmpeg)
-link_directories(${PROJECT_SOURCE_DIR}/ffmpeg/libavcodec ${PROJECT_SOURCE_DIR}/ffmpeg/libavformat ${PROJECT_SOURCE_DIR}/ffmpeg/libavutil ${PROJECT_SOURCE_DIR}/ffmpeg/libswresample ${PROJECT_SOURCE_DIR}/ffmpeg/libswscale ${PROJECT_SOURCE_DIR}/x264)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-s")
+find_package(SDL2_Image QUIET)
 
+if(NOT SDL2_IMAGE_FOUND)
+    find_path(SDL2_IMAGE_INCLUDE_DIR SDL_image.h
+        HINTS $ENV{VITASDK}/arm-vita-eabi/include/SDL2)
+    find_library(SDL2_IMAGE_LIBRARY NAMES SDL2_image SDL_image
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+    find_library(SDL2_WEBP_LIBRARY NAMES webp
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+    find_library(SDL2_WEBPDECODER_LIBRARY NAMES webpdecoder
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+    find_library(SDL2_WEBPDEMUX_LIBRARY NAMES webpdemux
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+    find_library(SDL2_WEBPMUX_LIBRARY NAMES webpmux
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+    find_library(SDL2_PTHREAD_LIBRARY NAMES pthread
+        HINTS $ENV{VITASDK}/arm-vita-eabi/lib)
+
+    if(NOT SDL2_IMAGE_LIBRARY)
+        message(FATAL_ERROR "SDL2_image not found; install it or set SDL2_IMAGE_DIR")
+    endif()
+endif()
+
+set(VITA_APP_NAME "OpenLieroVita")
+set(VITA_TITLEID  "LIER01337")
+set(VITA_VERSION  "01.00")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+add_definitions(-DVITA)
 set(SOURCES
     src/game/bobject.cpp
     src/game/bonus.cpp
@@ -77,48 +117,47 @@ set(GAME_SOURCES ${SOURCES}
     src/game/menu/timeBehavior.cpp
 )
 
-set(TC_TOOL_SOURCES ${SOURCES}
-    src/tc_tool/common_exereader.cpp
-    src/tc_tool/common_writer.cpp
-    src/tc_tool/tc_tool_main.cpp
+include_directories(
+    src
+    src/game
 )
 
-set(VIDEO_TOOL_SOURCES ${SOURCES}
-    src/game/replay.cpp
-    src/video_tool/replay_to_video.cpp
-    src/video_tool/tools_main.cpp
-    src/video_tool/video_recorder.c
+add_executable(${PROJECT_NAME} ${GAME_SOURCES})
+
+set(SDL2_IMAGE_LINK_LIB "")
+if(TARGET SDL2::SDL2_image)
+    set(SDL2_IMAGE_LINK_LIB SDL2::SDL2_image)
+elseif(SDL2_IMAGE_LIBRARY)
+    set(SDL2_IMAGE_LINK_LIB ${SDL2_IMAGE_LIBRARY})
+    if(SDL2_WEBP_LIBRARY)
+        list(APPEND SDL2_IMAGE_LINK_LIB ${SDL2_WEBP_LIBRARY})
+    endif()
+    if(SDL2_WEBPDECODER_LIBRARY)
+        list(APPEND SDL2_IMAGE_LINK_LIB ${SDL2_WEBPDECODER_LIBRARY})
+    endif()
+    if(SDL2_WEBPDEMUX_LIBRARY)
+        list(APPEND SDL2_IMAGE_LINK_LIB ${SDL2_WEBPDEMUX_LIBRARY})
+    endif()
+    if(SDL2_WEBPMUX_LIBRARY)
+        list(APPEND SDL2_IMAGE_LINK_LIB ${SDL2_WEBPMUX_LIBRARY})
+    endif()
+    if(SDL2_PTHREAD_LIBRARY)
+        list(APPEND SDL2_IMAGE_LINK_LIB ${SDL2_PTHREAD_LIBRARY})
+    endif()
+endif()
+
+target_link_libraries(${PROJECT_NAME} SDL2::SDL2 ${SDL2_IMAGE_LINK_LIB})
+# target_link_libraries(${PROJECT_NAME}
+#     SDL2::SDL2
+#     SDL2::SDL2_image
+# )
+
+vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME})
+vita_create_vpk(${PROJECT_NAME}.vpk ${VITA_TITLEID} ${PROJECT_NAME}.self
+  VERSION ${VITA_VERSION}
+  NAME ${VITA_APP_NAME}
+  FILE sce_sys/icon0.png sce_sys/icon0.png
+  FILE sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+  FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+  FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
 )
-
-if(APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-    set(GAME_SOURCES ${GAME_SOURCES} src/game/SDLmain.m)
-    set_source_files_properties(src/game/SDLmain.m PROPERTIES COMPILE_FLAGS "-std=c99")
-
-    # Populate RESOURCE_FILES with files to copy into the .app Resources/ directory.
-    file(GLOB_RECURSE RESOURCE_FILES pkg/*.cfg pkg/TC/* pkg/*.icns)
-else(APPLE)
-    set(GAME_SOURCES ${GAME_SOURCES} src/game/sdlmain.cpp)
-endif(APPLE)
-
-add_executable(openliero WIN32 ${GAME_SOURCES} ${RESOURCE_FILES} pkg/win32_icon.rc)
-add_executable(tctool ${TC_TOOL_SOURCES})
-add_executable(videotool EXCLUDE_FROM_ALL ${VIDEO_TOOL_SOURCES})
-target_link_libraries(openliero SDL2::SDL2 SDL2_image::SDL2_image)
-target_link_libraries(tctool SDL2::SDL2)
-target_link_libraries(videotool SDL2::SDL2 avcodec avformat avutil dl pthread swresample swscale x264)
-include_directories(src/game)
-
-if(APPLE)
-    set_target_properties(openliero PROPERTIES MACOSX_BUNDLE TRUE)
-    set_target_properties(openliero PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in")
-    set(MACOSX_BUNDLE_ICON_FILE liero)
-
-    # Preserve directory structure when copying contents of pkg/ to the .app Resources/ directory.
-    foreach(absolute_path ${RESOURCE_FILES})
-        file(RELATIVE_PATH relative_path "${CMAKE_CURRENT_SOURCE_DIR}/pkg" ${absolute_path})
-        get_filename_component(relative_path ${relative_path} DIRECTORY)
-        set_source_files_properties(${absolute_path}
-            PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/${relative_path}")
-    endforeach(absolute_path)
-endif(APPLE)

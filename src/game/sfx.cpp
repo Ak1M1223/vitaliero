@@ -1,3 +1,5 @@
+#include <psp2/kernel/processmgr.h>
+#include <vitasdk.h>
 #include "sfx.hpp"
 #include "reader.hpp"
 #include "console.hpp"
@@ -20,6 +22,7 @@ extern "C" void SDLCALL Sfx_callback(void *userdata, Uint8 *stream, int len)
 void Sfx::init()
 {
 #if !DISABLE_SOUND
+	sceClibPrintf("Sound turned on...\n");
 	if(initialized)
 		return;
 

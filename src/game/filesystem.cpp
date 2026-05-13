@@ -152,7 +152,7 @@ struct filename_result
 	char const* name;
 };
 
-#if GVL_LINUX || __APPLE__
+#if GVL_LINUX || defined(__APPLE__) || defined(__vita__) || defined(__PSP2__) || defined(__psp2__)
 
 # define BOOST_HANDLE DIR *
 # define BOOST_INVALID_HANDLE_VALUE 0
@@ -679,6 +679,12 @@ FsNodeZipArchive::FsNodeZipArchive(std::string const& path)
 FsNode::FsNode(std::string const& path)
 {
 	if (path.empty())
+	{
+		imp.reset(new FsNodeFilesystem(path));
+		return;
+	}
+
+	if (path.find("ux0:") == 0)
 	{
 		imp.reset(new FsNodeFilesystem(path));
 		return;

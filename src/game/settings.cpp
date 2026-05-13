@@ -26,7 +26,11 @@ Extensions::Extensions()
 , aiFrames(70*2), aiMutations(2)
 , aiTraces(false)
 , aiParallels(3)
+#ifdef VITA
+, fullscreen(true)
+#else
 , fullscreen(false)
+#endif
 , zoneTimeout(30)
 , selectBotWeapons(true)
 , allowViewingSpawnPoint(false)

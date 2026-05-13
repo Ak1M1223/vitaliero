@@ -1,5 +1,8 @@
-#include <SDL.h>
+#include <psp2/kernel/processmgr.h>
+#include <vitasdk.h>
+#include <SDL2/SDL.h>
 #include <SDL_image.h>
+#include <psp2/ctrl.h>
 #include <cstring>
 #include <cassert>
 #include <cstdlib>
@@ -32,6 +35,11 @@
 #include "menu/fileSelector.hpp"
 
 Gfx gfx;
+SceCtrlData vitactrl;
+enum {
+  SCREEN_WIDTH  = 960,
+  SCREEN_HEIGHT = 544
+};
 
 struct KeyBehavior : ItemBehavior
 {
@@ -280,9 +288,9 @@ Gfx::Gfx()
 , sdlDrawSurface(0)
 , running(true)
 , doubleRes(true)
-, menuCycles(0)
-, windowW(320 * 2)
-, windowH(200 * 2)
+, menuCycles(0)// Should check if this even works, maybe rescaler streches it to full screen.
+, windowW(320 * 3)
+, windowH(200 * 3)
 , prevMag(0)
 , keyBufPtr(keyBuf)
 {
@@ -294,11 +302,11 @@ void Gfx::init()
 {
 	SDL_ShowCursor(SDL_DISABLE);
 	lastFrame = SDL_GetTicks();
-
+	
 	playRenderer.init(320, 200);
 	singleScreenRenderer.init(640, 400);
 	// Joystick init
-	SDL_GameControllerEventState(SDL_ENABLE);
+	SDL_GameControllerEventState(SDL_ENABLE);//Add the joystick check here. Seen it in other projects.
 	int numJoysticks = SDL_NumJoysticks();
 	joysticks.resize(numJoysticks);
 	for ( int i = 0; i < numJoysticks; ++i ) {
@@ -362,12 +370,12 @@ void Gfx::setVideoMode()
 		}
 	}
 
-	flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+	//flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
-	if (settings->fullscreen)
-	{
-		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-	}
+	// if (settings->fullscreen)
+	// {
+	//   flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+	// }
 
 	if (!sdlWindow)
 	{
@@ -377,7 +385,8 @@ void Gfx::setVideoMode()
 		{
 			SDL_GetWindowPosition(sdlSpectatorWindow, &x, &y);
 		}
-		sdlWindow = SDL_CreateWindow("Liero 1.39", x + 100, y + 50, windowW, windowH, flags);
+		// sdlWindow = SDL_CreateWindow("Liero 1.39", x + 100, y + 50, windowW, windowH, flags);
+		sdlWindow = SDL_CreateWindow( "Liero", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 
 		// The Mac app will automatically use the .icns icon file located in the
 		// .app bundle, so don't override that here.
@@ -409,8 +418,11 @@ void Gfx::setVideoMode()
 	}
 	// vertical sync is always disabled. Frame limiting is done manually below,
 	// to keep the correct speed
-	sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0 /*SDL_RENDERER_PRESENTVSYNC*/);
-	onWindowResize(SDL_GetWindowID(sdlWindow));
+	//sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0 /*SDL_RENDERER_PRESENTVSYNC*/);
+	if ((sdlRenderer = SDL_CreateRenderer( sdlWindow, -1, 0)) == NULL)
+		sceClibPrintf("Failed to create SDL Renderer...\n");
+	sceClibPrintf("Created SDL Renderer...\n");
+	//onWindowResize(SDL_GetWindowID(sdlWindow));
 
 	// Set the spectator window's icon after the main window has been initialized.
 	// On Windows, this makes sure the icon in the stacked taskbar is the main icon.
@@ -428,10 +440,36 @@ void Gfx::setVideoMode()
 		}
 	}
 #endif
+	sceClibPrintf("Initializing SDL GFXinit...\n");
+	if (sdlTexture)
+		{
+			SDL_DestroyTexture(sdlTexture);
+			sdlTexture = NULL;
+		}
+		sdlTexture = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_ARGB8888,
+			                           SDL_TEXTUREACCESS_STREAMING,
+			                           doubleRes ? 640 : 320,
+		                         	   doubleRes ? 400 : 200);
+
+	if (sdlDrawSurface)
+		{
+			SDL_FreeSurface(sdlDrawSurface);
+			sdlDrawSurface = NULL;
+		}
+	sdlDrawSurface = SDL_CreateRGBSurface(0, doubleRes ? 640 : 320,
+													doubleRes ? 400 : 200, 32, 
+													0,0,0,0);
+	// linear for that old-school chunky look, but consider adding a user
+	// option for this
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	SDL_RenderSetLogicalSize(sdlRenderer, doubleRes ? 640 : 320,
+								doubleRes ? 400 : 200);
+	SDL_RenderSetVSync(sdlRenderer, 1);
 }
 
 void Gfx::onWindowResize(Uint32 windowID)
 {
+	sceClibPrintf("Window resized, updating render targets...\n");
 	if (windowID == SDL_GetWindowID(sdlWindow))
 	{
 		if (sdlTexture)
@@ -497,12 +535,12 @@ void Gfx::loadMenus()
 	hiddenMenu.addItem(MenuItem(48, 7, "PALETTE", HiddenMenu::PaletteSelect));
 	hiddenMenu.addItem(MenuItem(48, 7, "BOT WEAPONS", HiddenMenu::SelectBotWeapons));
 	hiddenMenu.addItem(MenuItem(48, 7, "SEE SPAWN POINT", HiddenMenu::AllowViewingSpawnPoint));
-	hiddenMenu.addItem(MenuItem(48, 7, "SINGLE SCREEN REPLAY", HiddenMenu::SingleScreenReplay));
-	hiddenMenu.addItem(MenuItem(48, 7, "SPECTATOR WINDOW", HiddenMenu::SpectatorWindow));
+	//hiddenMenu.addItem(MenuItem(48, 7, "SINGLE SCREEN REPLAY", HiddenMenu::SingleScreenReplay));
+	//hiddenMenu.addItem(MenuItem(48, 7, "SPECTATOR WINDOW", HiddenMenu::SpectatorWindow));
 
 	playerMenu.addItem(MenuItem(3, 7, "PROFILE LOADED", PlayerMenu::PlLoadedProfile));
 	playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE", PlayerMenu::PlSaveProfile));
-	playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE AS...", PlayerMenu::PlSaveProfileAs));
+	//playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE AS...", PlayerMenu::PlSaveProfileAs));
 	playerMenu.addItem(MenuItem(3, 7, "LOAD PROFILE", PlayerMenu::PlLoadProfile));
 	playerMenu.addItem(MenuItem(48, 7, "NAME", PlayerMenu::PlName));
 	playerMenu.addItem(MenuItem(48, 7, "HEALTH", PlayerMenu::PlHealth));
@@ -544,7 +582,7 @@ void Gfx::loadMenus()
 	mainMenu.addItem(MenuItem(10, 10, "", MainMenu::MaResumeGame)); // string set in menuLoop
 	mainMenu.addItem(MenuItem(10, 10, "", MainMenu::MaNewGame)); // string set in menuLoop
 	mainMenu.addItem(MenuItem(48, 48, "OPTIONS (F2)", MainMenu::MaAdvanced));
-	mainMenu.addItem(MenuItem(48, 48, "REPLAYS (F3)", MainMenu::MaReplays));
+	//mainMenu.addItem(MenuItem(48, 48, "REPLAYS (F3)", MainMenu::MaReplays));
 	mainMenu.addItem(MenuItem(48, 48, "TC", MainMenu::MaTc));
 	mainMenu.addItem(MenuItem(6, 6, "QUIT TO OS", MainMenu::MaQuit));
 	mainMenu.addItem(MenuItem::space());
@@ -623,8 +661,53 @@ void Gfx::setDoubleRes(bool newDoubleRes)
 	hiddenMenu.updateItems(*common);
 }
 
+uint32_t old_buttons = 0; 
+
+void Gfx::PushVitaKeyEvent(SDL_Scancode scancode, SDL_EventType type) {
+    SDL_Event event;
+    SDL_zero(event);
+
+    event.type = type;
+    event.key.state = (type == SDL_KEYDOWN) ? SDL_PRESSED : SDL_RELEASED;
+    event.key.repeat = 0;
+    event.key.timestamp = SDL_GetTicks();
+    event.key.keysym.scancode = scancode;
+    event.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
+
+    SDL_PushEvent(&event);
+}
+
+void Gfx::VitaKeysEvent() {
+    SceCtrlData vitactrl;
+    sceCtrlPeekBufferPositive(0, &vitactrl, 1);
+    uint32_t changed = vitactrl.buttons ^ old_buttons;
+    uint32_t pressed = changed & vitactrl.buttons;
+    uint32_t released = changed & old_buttons;
+
+    auto HandleMapping = [&](uint32_t mask, SDL_Scancode scancode) {
+        if (pressed & mask)  PushVitaKeyEvent(scancode, SDL_KEYDOWN);
+        if (released & mask) PushVitaKeyEvent(scancode, SDL_KEYUP);
+    };
+
+    HandleMapping(SCE_CTRL_START,    SDL_SCANCODE_RETURN);
+    HandleMapping(SCE_CTRL_SELECT,   SDL_SCANCODE_ESCAPE);
+    HandleMapping(SCE_CTRL_UP,       SDL_SCANCODE_UP);
+    HandleMapping(SCE_CTRL_DOWN,     SDL_SCANCODE_DOWN);
+    HandleMapping(SCE_CTRL_LEFT,     SDL_SCANCODE_LEFT);
+    HandleMapping(SCE_CTRL_RIGHT,    SDL_SCANCODE_RIGHT);
+    HandleMapping(SCE_CTRL_CROSS,    SDL_SCANCODE_RCTRL);
+    HandleMapping(SCE_CTRL_CIRCLE,   SDL_SCANCODE_BACKSPACE);
+    HandleMapping(SCE_CTRL_SQUARE,   SDL_SCANCODE_LCTRL);
+    HandleMapping(SCE_CTRL_TRIANGLE, SDL_SCANCODE_LALT);
+    HandleMapping(SCE_CTRL_LTRIGGER, SDL_SCANCODE_LSHIFT);
+    HandleMapping(SCE_CTRL_RTRIGGER, SDL_SCANCODE_RSHIFT);
+
+    old_buttons = vitactrl.buttons;
+}
+
 void Gfx::processEvent(SDL_Event& ev, Controller* controller)
 {
+	VitaKeysEvent();
 	switch(ev.type)
 	{
 		case SDL_KEYDOWN:
@@ -857,7 +940,6 @@ void Gfx::menuFlip(bool quitting)
 		++playRenderer.fadeValue;
 	if (singleScreenRenderer.fadeValue < 32 && !quitting)
 		++singleScreenRenderer.fadeValue;
-
 	++menuCycles;
 	playRenderer.pal = playRenderer.origpal;
 	playRenderer.pal.rotateFrom(playRenderer.origpal, 168, 174, menuCycles);
@@ -878,7 +960,6 @@ void Gfx::draw(SDL_Surface& surface, SDL_Texture& texture, SDL_Renderer& sdlRend
 	int offsetX, offsetY;
 	int mag = fitScreen(surface.w, surface.h,
 						renderer.renderResX, renderer.renderResY, offsetX, offsetY);
-
 	gvl::rect newRect(offsetX, offsetY, renderer.renderResX * mag, renderer.renderResY * mag);
 
 	if(mag != prevMag)
@@ -891,22 +972,18 @@ void Gfx::draw(SDL_Surface& surface, SDL_Texture& texture, SDL_Renderer& sdlRend
 	else
 		updateRect = newRect;
 	prevMag = mag;
-
 	std::size_t destPitch = surface.pitch;
 	std::size_t srcPitch = renderer.bmp.pitch;
-
 	PalIdx* dest = reinterpret_cast<PalIdx*>(surface.pixels) + offsetY * destPitch + offsetX * surface.format->BytesPerPixel;
 	PalIdx* src = renderer.bmp.pixels;
-
 	uint32_t pal32[256];
 	preparePalette(surface.format, realPal, pal32);
 	scaleDraw(src, renderer.renderResX, renderer.renderResY, srcPitch, dest, destPitch, mag, pal32);
-
 	SDL_UpdateTexture(&texture, NULL, surface.pixels, surface.w * 4);
-	SDL_RenderClear(&sdlRenderer);
-	SDL_RenderCopy(&sdlRenderer, &texture, NULL, NULL);
+	if (SDL_RenderCopy(&sdlRenderer, &texture, NULL, NULL) != 0) {
+        sceClibPrintf("SDL_RenderCopy Error: %s\n", SDL_GetError());
+    }
 	SDL_RenderPresent(&sdlRenderer);
-
 	lastUpdateRect = updateRect;
 }
 
@@ -920,7 +997,6 @@ void Gfx::flip()
 	{
 		draw(*sdlSpectatorDrawSurface, *sdlSpectatorTexture, *sdlSpectatorRenderer, singleScreenRenderer);
 	}
-
 	static unsigned int const delay = 14u;
 
 	uint32_t wantedTime = lastFrame + delay;
@@ -1837,18 +1913,15 @@ void Gfx::mainLoop()
 {
 restart:
 	controller.reset(new LocalController(common, settings));
-
 	{
 		Level newLevel(*common);
 		newLevel.generateFromSettings(*common, *settings, rand);
 		controller->swapLevel(newLevel);
 	}
-
 	controller->currentGame()->focus(this->playRenderer);
 	controller->currentGame()->focus(this->singleScreenRenderer);
 
 	// TODO: Unfocus game when necessary
-
 	while(true)
 	{
 		playRenderer.clear();
@@ -2044,7 +2117,6 @@ int Gfx::menuLoop()
 		mainMenu.itemFromId(MainMenu::MaNewGame)->string = "NEW GAME (F1)";
 		startItemId = MainMenu::MaNewGame;
 	}
-
 	mainMenu.moveToFirstVisible();
 	settingsMenu.moveToFirstVisible();
 	settingsMenu.updateItems(common);
@@ -2052,7 +2124,6 @@ int Gfx::menuLoop()
 	playRenderer.fadeValue = 0;
 	singleScreenRenderer.fadeValue = 0;
 	curMenu = &mainMenu;
-
 	frozenScreen.copy(playRenderer.bmp);
 	singleScreenRenderer.clear();
 	if (controller->currentLevel())
@@ -2060,7 +2131,6 @@ int Gfx::menuLoop()
 		controller->currentLevel()->drawMiniature(singleScreenRenderer.bmp, centerX - 126, singleScreenRenderer.renderResY - 208, 2);
 	}
 	frozenSpectatorScreen.copy(singleScreenRenderer.bmp);
-
 	menuCycles = 0;
 	int selected = -1;
 	do
