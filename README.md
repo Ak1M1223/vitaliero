@@ -16,3 +16,14 @@ Playing
 * Select acts as an Escape Key.
 * Start acts as an Enter Key.
 * Set up Left and Right player configs and keybinds.
+
+Default Controls
+-----------------------
+```
+AIMUP/DOWN: Dpad Up/Down
+LEFT/RIGHT: Dpad Left/Right
+SHOOT:    : X
+JUMP      : O
+CHANGE WPN: ^ + Dpad Left/Right
+DIG       : []
+```  
