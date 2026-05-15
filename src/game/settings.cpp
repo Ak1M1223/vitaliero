@@ -20,7 +20,7 @@ int const Settings::wormAnimTab[] =
 };
 
 Extensions::Extensions()
-: recordReplays(true)
+: recordReplays(false)
 , loadPowerlevelPalette(true)
 , bloodParticleMax(700)
 , aiFrames(70*2), aiMutations(2)
@@ -32,7 +32,7 @@ Extensions::Extensions()
 , fullscreen(false)
 #endif
 , zoneTimeout(30)
-, selectBotWeapons(true)
+, selectBotWeapons(false)
 , allowViewingSpawnPoint(false)
 , singleScreenReplay(false)
 , spectatorWindow(false)
@@ -64,10 +64,12 @@ Settings::Settings()
 	wormSettings[0]->color = 32;
 	wormSettings[1]->color = 41;
 
-	unsigned char defControls[2][7] =
+	unsigned char defControls[2][8] =
 	{
-		{0x13, 0x21, 0x20, 0x22, 0x1D, 0x2A, 0x38},
-		{0xA0, 0xA8, 0xA3, 0xA5, 0x75, 0x90, 0x36}
+		{0xA0, 0xA8, 0xA3, 0xA5, 0x75, 0x38, 0x0E, 0x1D},
+		{0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09} 
+		//to minimize the chance that bot controls override player controls and vice versa 
+		//at least original from 1998 worked that way
 	};
 
 	unsigned char defRGB[2][3] =
@@ -78,9 +80,12 @@ Settings::Settings()
 
 	for(int i = 0; i < 2; ++i)
 	{
-		for(int j = 0; j < 7; ++j)
+		for(int j = 0; j < 8; ++j)
 		{
-			wormSettings[i]->controls[j] = defControls[i][j];
+			if(j<7)
+			{
+				wormSettings[i]->controls[j] = defControls[i][j]; //ehhh might trigger out of mem?
+			}
 			wormSettings[i]->controlsEx[j] = defControls[i][j];
 		}
 

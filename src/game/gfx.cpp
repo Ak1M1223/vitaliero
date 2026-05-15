@@ -3,6 +3,10 @@
 #include <SDL2/SDL.h>
 #include <SDL_image.h>
 #include <psp2/ctrl.h>
+#include <psp2/ime_dialog.h>
+#include <psp2/sysmodule.h>
+#include <psp2/apputil.h>
+
 #include <cstring>
 #include <cassert>
 #include <cstdlib>
@@ -375,7 +379,7 @@ void Gfx::setVideoMode()
 	// if (settings->fullscreen)
 	// {
 	//   flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-	// }
+	// }  // This doesn't do anything, flags straight up crash the SDL.
 
 	if (!sdlWindow)
 	{
@@ -459,8 +463,6 @@ void Gfx::setVideoMode()
 	sdlDrawSurface = SDL_CreateRGBSurface(0, doubleRes ? 640 : 320,
 													doubleRes ? 400 : 200, 32, 
 													0,0,0,0);
-	// linear for that old-school chunky look, but consider adding a user
-	// option for this
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SDL_RenderSetLogicalSize(sdlRenderer, doubleRes ? 640 : 320,
 								doubleRes ? 400 : 200);
@@ -523,8 +525,8 @@ void Gfx::onWindowResize(Uint32 windowID)
 
 void Gfx::loadMenus()
 {
-	hiddenMenu.addItem(MenuItem(48, 7, "FULLSCREEN (F11)", HiddenMenu::Fullscreen));
-	hiddenMenu.addItem(MenuItem(48, 7, "DOUBLE SIZE", HiddenMenu::DoubleRes));
+	//hiddenMenu.addItem(MenuItem(48, 7, "FULLSCREEN", HiddenMenu::Fullscreen)); //Does nothing on vita, default is ON
+	hiddenMenu.addItem(MenuItem(48, 7, "SCREEN FILTER", HiddenMenu::DoubleRes));
 	hiddenMenu.addItem(MenuItem(48, 7, "POWERLEVEL PALETTES", HiddenMenu::LoadPowerLevels));
 	hiddenMenu.addItem(MenuItem(48, 7, "SHADOWS", HiddenMenu::Shadows));
 	hiddenMenu.addItem(MenuItem(48, 7, "AUTO-RECORD REPLAYS", HiddenMenu::RecordReplays));
@@ -540,7 +542,7 @@ void Gfx::loadMenus()
 
 	playerMenu.addItem(MenuItem(3, 7, "PROFILE LOADED", PlayerMenu::PlLoadedProfile));
 	playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE", PlayerMenu::PlSaveProfile));
-	//playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE AS...", PlayerMenu::PlSaveProfileAs));
+	playerMenu.addItem(MenuItem(3, 7, "SAVE PROFILE AS...", PlayerMenu::PlSaveProfileAs));
 	playerMenu.addItem(MenuItem(3, 7, "LOAD PROFILE", PlayerMenu::PlLoadProfile));
 	playerMenu.addItem(MenuItem(48, 7, "NAME", PlayerMenu::PlName));
 	playerMenu.addItem(MenuItem(48, 7, "HEALTH", PlayerMenu::PlHealth));
@@ -581,14 +583,14 @@ void Gfx::loadMenus()
 
 	mainMenu.addItem(MenuItem(10, 10, "", MainMenu::MaResumeGame)); // string set in menuLoop
 	mainMenu.addItem(MenuItem(10, 10, "", MainMenu::MaNewGame)); // string set in menuLoop
-	mainMenu.addItem(MenuItem(48, 48, "OPTIONS (F2)", MainMenu::MaAdvanced));
+	mainMenu.addItem(MenuItem(48, 48, "OPTIONS", MainMenu::MaAdvanced));
 	//mainMenu.addItem(MenuItem(48, 48, "REPLAYS (F3)", MainMenu::MaReplays));
-	mainMenu.addItem(MenuItem(48, 48, "TC", MainMenu::MaTc));
+	mainMenu.addItem(MenuItem(48, 48, "TC (MODS)", MainMenu::MaTc));
 	mainMenu.addItem(MenuItem(6, 6, "QUIT TO OS", MainMenu::MaQuit));
 	mainMenu.addItem(MenuItem::space());
-	mainMenu.addItem(MenuItem(48, 48, "LEFT PLAYER (F5)", MainMenu::MaPlayer1Settings));
-	mainMenu.addItem(MenuItem(48, 48, "RIGHT PLAYER (F6)", MainMenu::MaPlayer2Settings));
-	mainMenu.addItem(MenuItem(48, 48, "MATCH SETUP (F7)", MainMenu::MaSettings));
+	mainMenu.addItem(MenuItem(48, 48, "LEFT PLAYER", MainMenu::MaPlayer1Settings));
+	mainMenu.addItem(MenuItem(48, 48, "RIGHT PLAYER", MainMenu::MaPlayer2Settings));
+	mainMenu.addItem(MenuItem(48, 48, "MATCH SETUP", MainMenu::MaSettings));
 
 	settingsMenu.valueOffsetX = 100;
 	playerMenu.valueOffsetX = 95;
@@ -707,7 +709,6 @@ void Gfx::VitaKeysEvent() {
 
 void Gfx::processEvent(SDL_Event& ev, Controller* controller)
 {
-	VitaKeysEvent();
 	switch(ev.type)
 	{
 		case SDL_KEYDOWN:
@@ -842,6 +843,7 @@ void Gfx::processEvent(SDL_Event& ev, Controller* controller)
 
 void Gfx::process(Controller* controller)
 {
+	VitaKeysEvent();
 	SDL_Event ev;
 	keyBufPtr = keyBuf;
 	while(SDL_PollEvent(&ev))
@@ -870,7 +872,8 @@ uint32_t Gfx::waitForKeyEx()
 	SDL_Event ev;
 	while(SDL_WaitEvent(&ev))
 	{
-		processEvent(ev);
+		VitaKeysEvent(); // get vita key event on config change
+		//processEvent(ev); //Dont care about normal process Event in this case I hope
 		switch (ev.type)
 		{
 		case SDL_KEYDOWN:
@@ -1721,85 +1724,79 @@ void Gfx::infoBox(std::string const& text, int x, int y, bool clearScreen)
 		fill(playRenderer.bmp, bgColor);
 }
 
+// Seems Vita keyboard overlay is 16bit
+static void ConvertToUTF16(const std::string& src, SceWChar16* dest, size_t maxLen) 
+{
+    size_t i = 0;
+    for (; i < src.length() && i < maxLen; ++i) {
+        dest[i] = static_cast<SceWChar16>(src[i]);
+    }
+    dest[i] = 0;
+}
+// Liero itself is 8bit
+static void ConvertToUTF8(const SceWChar16* src, std::string& dest) 
+{
+    dest.clear();
+    for (size_t i = 0; src[i] != 0; ++i) {
+        dest += static_cast<char>(src[i]);
+    }
+}
+
 bool Gfx::inputString(std::string& dest, std::size_t maxLen, int x, int y, int (*filter)(int), std::string const& prefix, bool centered)
 {
-	std::string buffer = dest;
+    SceImeDialogParam param;
+    sceImeDialogParamInit(&param);
 
-	while(true)
-	{
-		std::string str = prefix + buffer + '_';
+    SceWChar16 titleW[64];
+    ConvertToUTF16(prefix.empty() ? "Enter Text:" : prefix, titleW, 63);
+    SceWChar16 bufferW[256];
+    ConvertToUTF16(dest, bufferW, maxLen);
 
-		Font& font = common->font;
+    param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
+    param.languagesForced    = SCE_TRUE;
+    param.type               = SCE_IME_TYPE_DEFAULT;
+    param.title              = titleW;
+    param.maxTextLength      = maxLen;
+    param.inputTextBuffer    = bufferW;
+    param.dialogMode         = SCE_IME_DIALOG_DIALOG_MODE_DEFAULT;
+    param.textBoxMode        = SCE_IME_DIALOG_TEXTBOX_MODE_WITH_CLEAR;
 
-		int width = font.getDims(str);
+    if (sceImeDialogInit(&param) < 0) {
+        return false;
+    }
+    bool accepted = false;
 
-		int adjust = centered ? width/2 : 0;
+    while (running) {
+        flip(); 
+        SceCommonDialogStatus status = sceImeDialogGetStatus();
+        if (status == SCE_COMMON_DIALOG_STATUS_FINISHED) {
+            SceImeDialogResult result;
+            std::memset(&result, 0, sizeof(SceImeDialogResult));
+            sceImeDialogGetResult(&result);
 
-		int clrX = x - 10 - adjust;
+            if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+                std::string outputStr;
+                ConvertToUTF8(bufferW, outputStr);
+                dest.clear();
+                for (char c : outputStr) {
+                    int k = static_cast<int>(c);
+                    if (filter) {
+                        k = filter(k);
+                    }
+                    if (k) {
+                        dest += static_cast<char>(k);
+                    }
+                }
 
-		SDL_Event ev;
-
-		//int offset = clrX + y*320; // TODO: Unhardcode 320
-
-		blitImageNoKeyColour(playRenderer.bmp, &frozenScreen.getPixel(clrX, y), clrX, y, clrX + 10 + width, 8, frozenScreen.pitch);
-
-		drawRoundedBox(playRenderer.bmp, x - 2 - adjust, y, 0, 7, width);
-
-		font.drawText(playRenderer.bmp, str, x - adjust, y + 1, 50);
-		flip();
-
-		SDL_StartTextInput();
-		SDL_WaitEvent(&ev);
-		processEvent(ev);
-
-		switch (ev.type)
-		{
-			case SDL_KEYDOWN:
-				switch (ev.key.keysym.scancode)
-				{
-					case SDL_SCANCODE_BACKSPACE:
-						if(!buffer.empty())
-						{
-							buffer.erase(buffer.size() - 1);
-						}
-						break;
-
-					case SDL_SCANCODE_RETURN:
-					case SDL_SCANCODE_KP_ENTER:
-						dest = buffer;
-						sfx.play(*common, 27);
-						clearKeys();
-						return true;
-
-					case SDL_SCANCODE_ESCAPE:
-						clearKeys();
-						return false;
-
-					default:
-						break;
-				}
-				break;
-
-			case SDL_TEXTINPUT:
-			{
-				int k = utf8ToDOS(ev.text.text);
-				if (k && buffer.size() < maxLen &&
-					(!filter || (k = filter(k))))
-				{
-					buffer += char(k);
-				}
-				break;
-			}
-			case SDL_TEXTEDITING:
-				// since there's no support for any characters that can use a
-				// complex IME input (like East Asian languages), we naively
-				// discard this event
-				break;
-
-			default:
-				break;
+                sfx.play(*common, 27);
+                accepted = true;
+            }
+            break;
         }
-	}
+    }
+    sceImeDialogTerm();
+    clearKeys();
+    return accepted;
 }
 
 int filterDigits(int k)
@@ -2108,14 +2105,14 @@ int Gfx::menuLoop()
 	if (controller->running())
 	{
 		mainMenu.setVisibility(MainMenu::MaResumeGame, true);
-		mainMenu.itemFromId(MainMenu::MaResumeGame)->string = "RESUME GAME (F1)";
+		mainMenu.itemFromId(MainMenu::MaResumeGame)->string = "RESUME GAME";
 		mainMenu.itemFromId(MainMenu::MaNewGame)->string = "NEW GAME";
 		startItemId = MainMenu::MaResumeGame;
 	}
 	else
 	{
 		mainMenu.setVisibility(MainMenu::MaResumeGame, false);
-		mainMenu.itemFromId(MainMenu::MaNewGame)->string = "NEW GAME (F1)";
+		mainMenu.itemFromId(MainMenu::MaNewGame)->string = "NEW GAME";
 		startItemId = MainMenu::MaNewGame;
 	}
 	mainMenu.moveToFirstVisible();
