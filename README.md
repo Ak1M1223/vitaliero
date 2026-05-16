@@ -1,9 +1,5 @@
-
-Building (Linux/WSL)
------------------------
-* Build VitaSDK and set it up.
-* Dependencies: CMake, gcc
-* Run: ```./build-all```
+Diclaimer:
+Some of the CmakeLists.txt were AI generated
 
 Installation in PSvita.
 -----------------------
@@ -26,4 +22,11 @@ SHOOT:    : X
 JUMP      : O
 CHANGE WPN: ^ + Dpad Left/Right
 DIG       : []
-```  
+```
+
+Building (Linux/WSL)
+-----------------------
+This repo is capable only of building PSVita version.
+* Build VitaSDK and set it up.
+* Dependencies: CMake, gcc
+* Run: ```./build-all```
