@@ -1,5 +1,4 @@
-Diclaimer:
-Some of the CmakeLists.txt were AI generated
+Diclaimer: Some of the CmakeLists.txt were AI generated (SDL2_IMAGE segment).
 
 Installation in PSvita.
 -----------------------

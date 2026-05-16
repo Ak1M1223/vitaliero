@@ -310,7 +310,8 @@ void Gfx::init()
 	playRenderer.init(320, 200);
 	singleScreenRenderer.init(640, 400);
 	// Joystick init
-	SDL_GameControllerEventState(SDL_ENABLE);//Add the joystick check here. Seen it in other projects.
+	sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+	//SDL_GameControllerEventState(SDL_ENABLE);//Add the joystick check here. Seen it in other projects.
 	int numJoysticks = SDL_NumJoysticks();
 	joysticks.resize(numJoysticks);
 	for ( int i = 0; i < numJoysticks; ++i ) {
@@ -695,35 +696,43 @@ void Gfx::VitaJoystickEvent() {
     bool new_up_r    = (ryvar < -deadzone);
     bool new_down_r  = (ryvar > deadzone);
 
-    if (new_left_l != old_left_l) {
+    if (new_left_l != old_left_l)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_A, new_left_l ? SDL_KEYDOWN : SDL_KEYUP);
         old_left_l = new_left_l;
     }
-    if (new_right_l != old_right_l) {
+    if (new_right_l != old_right_l)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_D, new_right_l ? SDL_KEYDOWN : SDL_KEYUP);
         old_right_l = new_right_l;
     }
-    if (new_up_l != old_up_l) {
+    if (new_up_l != old_up_l)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_W, new_up_l ? SDL_KEYDOWN : SDL_KEYUP);
         old_up_l = new_up_l;
     }
-    if (new_down_l != old_down_l) {
+    if (new_down_l != old_down_l)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_S, new_down_l ? SDL_KEYDOWN : SDL_KEYUP);
         old_down_l = new_down_l;
     }
-	if (new_left_r != old_left_r) {
+	if (new_left_r != old_left_r)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_J, new_left_r ? SDL_KEYDOWN : SDL_KEYUP);
         old_left_r = new_left_r;
     }
-    if (new_right_r != old_right_r) {
+    if (new_right_r != old_right_r)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_L, new_right_r ? SDL_KEYDOWN : SDL_KEYUP);
         old_right_r = new_right_r;
     }
-    if (new_up_r != old_up_r) {
+    if (new_up_r != old_up_r)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_I, new_up_r ? SDL_KEYDOWN : SDL_KEYUP);
         old_up_r = new_up_r;
     }
-    if (new_down_r != old_down_r) {
+    if (new_down_r != old_down_r)
+	{
         PushVitaKeyEvent(SDL_SCANCODE_K, new_down_r ? SDL_KEYDOWN : SDL_KEYUP);
         old_down_r = new_down_r;
     }
@@ -939,7 +948,8 @@ uint32_t Gfx::waitForKeyEx()
 	SDL_Event ev;
 	while(SDL_WaitEvent(&ev))
 	{
-		VitaKeysEvent(); // get vita key event on config change
+		VitaKeysEvent();
+		VitaJoystickEvent();
 		//processEvent(ev); //Dont care about normal process Event in this case I hope
 		switch (ev.type)
 		{
