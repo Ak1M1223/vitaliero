@@ -663,6 +663,72 @@ void Gfx::setDoubleRes(bool newDoubleRes)
 	hiddenMenu.updateItems(*common);
 }
 
+void Gfx::VitaJoystickEvent() {
+    SceCtrlData vitactrl;
+    sceCtrlPeekBufferPositive(0, &vitactrl, 1);
+
+    //uint to int (0-255 to -128 to 127) and apply deadzone
+    int lxvar = (int)vitactrl.lx - 128;
+    int lyvar = (int)vitactrl.ly - 128;
+	int rxvar = (int)vitactrl.rx - 128;
+    int ryvar = (int)vitactrl.ry - 128;
+    const int deadzone = 50;
+
+    static bool old_left_l  = false;
+    static bool old_right_l = false;
+    static bool old_up_l    = false;
+    static bool old_down_l  = false;
+
+	static bool old_left_r  = false;
+    static bool old_right_r = false;
+    static bool old_up_r    = false;
+    static bool old_down_r  = false;
+
+    //check thresholds against deadzone//I am dying from that state logic.
+    bool new_left_l  = (lxvar < -deadzone);
+    bool new_right_l = (lxvar > deadzone);
+    bool new_up_l    = (lyvar < -deadzone);
+    bool new_down_l  = (lyvar > deadzone);
+
+	bool new_left_r  = (rxvar < -deadzone);
+    bool new_right_r = (rxvar > deadzone);
+    bool new_up_r    = (ryvar < -deadzone);
+    bool new_down_r  = (ryvar > deadzone);
+
+    if (new_left_l != old_left_l) {
+        PushVitaKeyEvent(SDL_SCANCODE_A, new_left_l ? SDL_KEYDOWN : SDL_KEYUP);
+        old_left_l = new_left_l;
+    }
+    if (new_right_l != old_right_l) {
+        PushVitaKeyEvent(SDL_SCANCODE_D, new_right_l ? SDL_KEYDOWN : SDL_KEYUP);
+        old_right_l = new_right_l;
+    }
+    if (new_up_l != old_up_l) {
+        PushVitaKeyEvent(SDL_SCANCODE_W, new_up_l ? SDL_KEYDOWN : SDL_KEYUP);
+        old_up_l = new_up_l;
+    }
+    if (new_down_l != old_down_l) {
+        PushVitaKeyEvent(SDL_SCANCODE_S, new_down_l ? SDL_KEYDOWN : SDL_KEYUP);
+        old_down_l = new_down_l;
+    }
+	if (new_left_r != old_left_r) {
+        PushVitaKeyEvent(SDL_SCANCODE_J, new_left_r ? SDL_KEYDOWN : SDL_KEYUP);
+        old_left_r = new_left_r;
+    }
+    if (new_right_r != old_right_r) {
+        PushVitaKeyEvent(SDL_SCANCODE_L, new_right_r ? SDL_KEYDOWN : SDL_KEYUP);
+        old_right_r = new_right_r;
+    }
+    if (new_up_r != old_up_r) {
+        PushVitaKeyEvent(SDL_SCANCODE_I, new_up_r ? SDL_KEYDOWN : SDL_KEYUP);
+        old_up_r = new_up_r;
+    }
+    if (new_down_r != old_down_r) {
+        PushVitaKeyEvent(SDL_SCANCODE_K, new_down_r ? SDL_KEYDOWN : SDL_KEYUP);
+        old_down_r = new_down_r;
+    }
+}
+
 uint32_t old_buttons = 0; 
 
 void Gfx::PushVitaKeyEvent(SDL_Scancode scancode, SDL_EventType type) {
@@ -844,6 +910,7 @@ void Gfx::processEvent(SDL_Event& ev, Controller* controller)
 void Gfx::process(Controller* controller)
 {
 	VitaKeysEvent();
+	VitaJoystickEvent();
 	SDL_Event ev;
 	keyBufPtr = keyBuf;
 	while(SDL_PollEvent(&ev))

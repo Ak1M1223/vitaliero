@@ -193,6 +193,7 @@ struct Gfx
 	void saveSettings(FsNode node);
 	bool loadSettings(FsNode node);
 	bool loadSettingsLegacy(FsNode node);
+	void VitaJoystickEvent();
 	void PushVitaKeyEvent(SDL_Scancode scancode, SDL_EventType type);
 	void VitaKeysEvent();
 	void processEvent(SDL_Event& ev, Controller* controller = 0);

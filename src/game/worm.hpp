@@ -114,7 +114,7 @@ struct WormSettings : gvl::shared, WormSettingsExtensions
 	uint32_t weapons[5]; // TODO: Adjustable
 	std::string name;
 	int rgb[3];
-	bool randomName;
+	bool randomName; //Somehow doesn't work on Vita
 
 	int color;
 

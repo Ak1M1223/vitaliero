@@ -63,6 +63,12 @@ Settings::Settings()
 
 	wormSettings[0]->color = 32;
 	wormSettings[1]->color = 41;
+	wormSettings[0]->randomName = false;
+	wormSettings[0]->name = "Player";
+	wormSettings[1]->randomName = false;
+	wormSettings[1]->name = "Bot";
+	wormSettings[0]->controller = 0; // default first player to human
+	wormSettings[1]->controller = 1; // default second player to CPU
 
 	unsigned char defControls[2][8] =
 	{
